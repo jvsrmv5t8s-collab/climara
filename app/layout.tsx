@@ -26,7 +26,7 @@ const jost = Jost({
   weight: ["300", "400", "500"],
 });
 
-const BASE_URL = "https://climara.app";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://climara.app";
 
 export const metadata: Metadata = {
   title: "Climara — Weather & Local Time Around the World",
