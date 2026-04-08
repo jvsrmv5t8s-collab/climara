@@ -700,13 +700,15 @@ export function getCityById(id: string): City | undefined {
   return cityById.get(id);
 }
 
-/** Case-insensitive match on name or country; empty query yields []. */
+function normalize(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+/** Case-insensitive, accent-insensitive match on name or country; empty query yields []. */
 export function searchCities(query: string, limit = 12): City[] {
-  const q = query.trim().toLowerCase();
+  const q = normalize(query.trim());
   if (!q) return [];
   return CITIES.filter(
-    (c) =>
-      c.name.toLowerCase().includes(q) ||
-      c.country.toLowerCase().includes(q),
+    (c) => normalize(c.name).includes(q) || normalize(c.country).includes(q),
   ).slice(0, limit);
 }
