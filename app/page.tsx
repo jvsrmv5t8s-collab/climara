@@ -15,6 +15,7 @@ import {
 import { CityCard } from "@/components/CityPolaroidCard";
 import { useWeatherForCities } from "@/lib/useWeatherForCities";
 import { useTypedPlaceholder } from "@/lib/useTypedPlaceholder";
+import { usePostHog } from "posthog-js/react";
 
 // ─── Storage ─────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ function AddCityPanel({
   const [listOpen, setListOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const typedCity = useTypedPlaceholder();
+  const posthog = usePostHog();
 
   useEffect(() => {
     function onDown(e: MouseEvent) {
@@ -152,7 +154,10 @@ function AddCityPanel({
                   type="button"
                   className="w-full px-6 py-2.5 text-left hover:bg-stone-50"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => onAdd(c.id)}
+                  onClick={() => {
+                    posthog?.capture('city_searched', { query });
+                    onAdd(c.id);
+                  }}
                   style={{ fontFamily: "var(--font-label)" }}
                 >
                   <span className="font-medium text-stone-800">{c.name}</span>
@@ -197,10 +202,18 @@ export default function Home() {
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const typedCity = useTypedPlaceholder();
+  const posthog = usePostHog();
 
   useEffect(() => {
-    queueMicrotask(() => setSlots(loadSlots()));
-  }, []);
+    queueMicrotask(() => {
+      const loaded = loadSlots();
+      const cityCount = [loaded.center, loaded.left, loaded.right].filter(Boolean).length;
+      if (cityCount > 0) {
+        posthog?.capture('session_restored', { city_count: cityCount });
+      }
+      setSlots(loaded);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!lastAddedId) return;
@@ -249,18 +262,26 @@ export default function Home() {
 
   // Add first (center) city from landing page
   const addFirstCity = useCallback((id: string) => {
+    const city = getCityById(id);
+    posthog?.capture('city_searched', { query: searchQuery });
+    posthog?.capture('city_selected', { city_name: city?.name ?? id, slot_position: 'center' });
     const next: SlotState = { center: id, left: null, right: null };
     setSlots(next);
     persistSlots(next);
     setLastAddedId(id);
     setSearchQuery("");
     setListOpen(false);
-  }, []);
+  }, [posthog, searchQuery]);
 
   // Add city to a specific slot from the overlay
   const addCityToSlot = useCallback(
     (id: string) => {
       if (!addingSlot) return;
+      const city = getCityById(id);
+      posthog?.capture('city_selected', {
+        city_name: city?.name ?? id,
+        slot_position: addingSlot,
+      });
       setSlots((prev) => {
         const next = { ...prev, [addingSlot]: id };
         persistSlots(next);
@@ -269,12 +290,18 @@ export default function Home() {
       setLastAddedId(id);
       setAddingSlot(null);
     },
-    [addingSlot],
+    [addingSlot, posthog],
   );
 
   // Remove a city from its slot
   const removeFromSlot = useCallback(
     (slot: "center" | "left" | "right") => {
+      const cityId = slots[slot];
+      const city = cityId ? getCityById(cityId) : null;
+      posthog?.capture('city_removed', {
+        city_name: city?.name ?? cityId ?? 'unknown',
+        slot_position: slot,
+      });
       setSlots((prev) => {
         let next: SlotState;
         if (slot !== "center") {
@@ -293,7 +320,15 @@ export default function Home() {
         return next;
       });
     },
-    [],
+    [posthog, slots],
+  );
+
+  const openSlot = useCallback(
+    (position: 'left' | 'right') => {
+      posthog?.capture('slot_opened', { slot_position: position });
+      setAddingSlot(position);
+    },
+    [posthog],
   );
 
   // ── Landing page ────────────────────────────────────────────────────────────
@@ -406,7 +441,7 @@ export default function Home() {
               />
             </div>
           ) : (
-            <AddSlotButton onClick={() => setAddingSlot("left")} />
+            <AddSlotButton onClick={() => openSlot("left")} />
           )}
 
           {/* Center (featured) */}
@@ -434,7 +469,7 @@ export default function Home() {
               />
             </div>
           ) : (
-            <AddSlotButton onClick={() => setAddingSlot("right")} />
+            <AddSlotButton onClick={() => openSlot("right")} />
           )}
 
         </div>
@@ -470,8 +505,8 @@ export default function Home() {
             />
           )}
           <div className="flex gap-4">
-            {!leftCity && <AddSlotButton onClick={() => setAddingSlot("left")} />}
-            {!rightCity && <AddSlotButton onClick={() => setAddingSlot("right")} />}
+            {!leftCity && <AddSlotButton onClick={() => openSlot("left")} />}
+            {!rightCity && <AddSlotButton onClick={() => openSlot("right")} />}
           </div>
         </div>
       </div>
