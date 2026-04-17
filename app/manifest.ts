@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Somewher — Always know the time and weather for the people you care about",
+    name: "Somewher",
     short_name: "Somewher",
     description:
       "Always know the time and weather for the people you care about.",
