@@ -27,33 +27,37 @@ const jost = Jost({
   weight: ["300", "400", "500"],
 });
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://climara.app";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://somewher.co";
 
 export const metadata: Metadata = {
-  title: "Climara — Weather & Local Time Around the World",
+  title: "Somewher — Always know the time and weather for the people you care about",
+  icons: {
+    icon: "/Somewher_MacOS.png",
+    apple: "/Somewher_MacOS.png",
+  },
   description:
-    "See the weather and local time for your favorite cities at a glance. Add up to three cities and watch them side by side in real time.",
+    "Always know the time and weather for the people you care about. Add the people closest to you and see their city's weather and local time, side by side in real time.",
   metadataBase: new URL(BASE_URL),
   openGraph: {
-    title: "Climara",
-    description: "Real-time weather and local time for cities around the world.",
+    title: "Somewher",
+    description: "Always know the time and weather for the people you care about.",
     url: BASE_URL,
-    siteName: "Climara",
+    siteName: "Somewher",
     images: [
       {
-        url: "/og.png",
+        url: "/OG_Image_Somewher.png",
         width: 1200,
         height: 630,
-        alt: "Climara — Weather & Local Time Around the World",
+        alt: "Somewher — Always know the time and weather for the people you care about",
       },
     ],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Climara",
-    description: "Real-time weather and local time for cities around the world.",
-    images: ["/og.png"],
+    title: "Somewher",
+    description: "Always know the time and weather for the people you care about.",
+    images: ["/OG_Image_Somewher.png"],
   },
 };
 

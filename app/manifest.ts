@@ -2,14 +2,14 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Climara — Weather & Local Time Around the World",
-    short_name: "Climara",
+    name: "Somewher — Always know the time and weather for the people you care about",
+    short_name: "Somewher",
     description:
-      "See the weather and local time for your favorite cities at a glance.",
+      "Always know the time and weather for the people you care about.",
     start_url: "/",
     display: "standalone",
-    background_color: "#c6dff0",
-    theme_color: "#c6dff0",
+    background_color: "#F1EDE5",
+    theme_color: "#F1EDE5",
     icons: [
       {
         src: "/icon-192x192.png",

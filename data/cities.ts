@@ -178,7 +178,7 @@ export const CITIES: City[] = [
   },
   {
     id: "cancun",
-    name: "Cancún",
+    name: "Cancun",
     country: "Mexico",
     latitude: 21.1619,
     longitude: -86.8515,
@@ -198,7 +198,7 @@ export const CITIES: City[] = [
   // ── South America ──────────────────────────────────────────────────────────
   {
     id: "sao-paulo",
-    name: "São Paulo",
+    name: "Sao Paulo",
     country: "Brazil",
     latitude: -23.5505,
     longitude: -46.6333,
@@ -225,7 +225,7 @@ export const CITIES: City[] = [
   },
   {
     id: "bogota",
-    name: "Bogotá",
+    name: "Bogota",
     country: "Colombia",
     latitude: 4.711,
     longitude: -74.0721,
@@ -252,7 +252,7 @@ export const CITIES: City[] = [
   },
   {
     id: "medellin",
-    name: "Medellín",
+    name: "Medellin",
     country: "Colombia",
     latitude: 6.2442,
     longitude: -75.5812,

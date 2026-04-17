@@ -26,6 +26,8 @@ export type CityCardProps =
       size: "featured" | "standard";
       city: City;
       weather: WeatherState | undefined;
+      connectionName: string;
+      connectionPhoto: string;
       animateEnter?: boolean;
       onRemove?: () => void;
     }
@@ -38,23 +40,42 @@ export type CityCardProps =
 
 export function CityCard(props: CityCardProps) {
   if (props.variant === "sample") {
-    return <SampleCard name={props.name} imageSeed={props.imageSeed} priority={props.priority} />;
+    return (
+      <SampleCard
+        name={props.name}
+        imageSeed={props.imageSeed}
+        priority={props.priority}
+      />
+    );
   }
   return (
     <LiveCard
       size={props.size}
       city={props.city}
       weather={props.weather}
+      connectionName={props.connectionName}
+      connectionPhoto={props.connectionPhoto}
       animateEnter={props.animateEnter}
       onRemove={props.onRemove}
     />
   );
 }
 
-function SampleCard({ name, imageSeed, priority = false }: { name: string; imageSeed: string; priority?: boolean }) {
+function SampleCard({
+  name,
+  imageSeed,
+  priority = false,
+}: {
+  name: string;
+  imageSeed: string;
+  priority?: boolean;
+}) {
   const [src, onError] = useCityImageSrc(imageSeed);
   return (
-    <article className="relative overflow-hidden rounded-2xl w-[200px] h-[260px] select-none shrink-0" aria-hidden>
+    <article
+      className="relative overflow-hidden rounded-2xl w-[200px] h-[260px] select-none shrink-0"
+      aria-hidden
+    >
       <Image
         src={src}
         alt=""
@@ -97,21 +118,31 @@ function SampleCard({ name, imageSeed, priority = false }: { name: string; image
   );
 }
 
+function getInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length === 1) return words[0][0].toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
 function LiveCard({
   size,
   city,
   weather,
+  connectionName,
+  connectionPhoto,
   animateEnter,
   onRemove,
 }: {
   size: "featured" | "standard";
   city: City;
   weather: WeatherState | undefined;
+  connectionName: string;
+  connectionPhoto: string;
   animateEnter?: boolean;
   onRemove?: () => void;
 }) {
   const localTime = useLiveLocalTime12h(city.timezone);
-  const [imgSrc, onImgError] = useCityImageSrc(city.id);
+  const [src, onError] = useCityImageSrc(city.id);
 
   const isFeatured = size === "featured";
 
@@ -136,57 +167,87 @@ function LiveCard({
     "relative overflow-hidden select-none group",
     isFeatured ? "rounded-2xl" : "rounded-xl",
     isFeatured ? "w-[min(100%,480px)]" : "w-[min(100%,360px)]",
-    animateEnter ? "climara-card-enter" : "",
+    animateEnter ? "somewher-card-enter" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   const paddingClass = isFeatured ? "p-6" : "p-[18px]";
-  const cityNameClass = isFeatured ? "text-2xl" : "text-xl";
-  const tempClass = isFeatured ? "text-[128px]" : "text-[clamp(4rem,9vw,6.5rem)]";
-  const labelClass = "text-base";
+  const avatarSize = isFeatured ? "size-14" : "size-10";
+  const avatarText = isFeatured ? "text-base" : "text-xs";
+  const tempClass = isFeatured ? "text-[150px]" : "text-[clamp(4rem,9vw,7rem)]";
+  const labelClass = isFeatured ? "text-[18px]" : "text-[14px]";
 
   return (
     <article className={cardClasses}>
-      <div className={isFeatured ? "relative aspect-[4/5]" : "relative aspect-[3/4]"}>
+      <div className="relative aspect-[13/20]">
+        {/* City background */}
         <Image
-          src={imgSrc}
+          src={src}
           alt={city.name}
           fill
           className="object-cover"
           sizes={isFeatured ? "480px" : "360px"}
           loading={isFeatured ? "eager" : "lazy"}
-          onError={onImgError}
+          onError={onError}
         />
-        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-black/30" />
 
-        <div
-          className={`absolute inset-0 flex flex-col justify-between ${paddingClass}`}
-        >
-          <p
-            className={`text-center text-white font-light tracking-wide ${cityNameClass}`}
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {city.name}
-          </p>
+        <div className={`absolute inset-0 flex flex-col justify-between ${paddingClass}`}>
 
-          <p
-            className={`text-center text-white font-light leading-none ${tempClass}`}
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {tempDisplay}
-          </p>
+          {/* Top: avatar + person name */}
+          <div className="flex flex-col items-center gap-2">
+            <div className={`${avatarSize} rounded-full overflow-hidden ring-2 ring-white/40 shrink-0`}>
+              {connectionPhoto ? (
+                <img
+                  src={connectionPhoto}
+                  alt={connectionName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div
+                  className={`w-full h-full flex items-center justify-center bg-white/20 text-white font-medium ${avatarText}`}
+                  style={{ fontFamily: "var(--font-label)" }}
+                >
+                  {getInitials(connectionName)}
+                </div>
+              )}
+            </div>
+            <p
+              className="text-white text-[18px] leading-none"
+              style={{ fontFamily: "var(--font-label)", fontWeight: 400 }}
+            >
+              {connectionName}
+            </p>
+          </div>
 
-          <div className="flex justify-between items-end">
-            <span
-              className={`text-white/90 ${labelClass}`}
+          {/* Center: city name + temperature */}
+          <div className="flex flex-col items-center gap-2">
+            <p
+              className={`text-center text-white uppercase leading-none tracking-[1.6px] ${isFeatured ? "text-[28px]" : "text-[22px]"}`}
               style={{ fontFamily: "var(--font-label)", fontWeight: 300 }}
+            >
+              {city.name}
+            </p>
+            <p
+              className={`text-center text-white leading-none ${tempClass}`}
+              style={{ fontFamily: "var(--font-display)", fontWeight: 400 }}
+            >
+              {tempDisplay}
+            </p>
+          </div>
+
+          {/* Bottom: time + high/low */}
+          <div className="flex justify-between items-center">
+            <span
+              className={`text-white ${labelClass}`}
+              style={{ fontFamily: "var(--font-label)", fontWeight: 400 }}
             >
               {localTime}
             </span>
             <span
-              className={`text-white/90 ${labelClass}`}
-              style={{ fontFamily: "var(--font-label)", fontWeight: 300 }}
+              className={`text-white ${labelClass}`}
+              style={{ fontFamily: "var(--font-label)", fontWeight: 400 }}
             >
               {highLowDisplay}
             </span>
@@ -197,8 +258,8 @@ function LiveCard({
           <button
             type="button"
             onClick={onRemove}
-            aria-label={`Remove ${city.name}`}
-            className="absolute top-3 right-3 size-7 flex items-center justify-center rounded-full bg-black/30 text-white/70 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/50 hover:text-white text-xs"
+            aria-label={`Remove ${connectionName}`}
+            className="absolute top-3 right-3 size-7 flex items-center justify-center rounded-full bg-black/30 text-white/70 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity hover:bg-black/50 hover:text-white text-xs"
           >
             ✕
           </button>

@@ -1,33 +1,35 @@
 "use client";
 
-import {
-  useMemo,
-  useEffect,
-  useState,
-  useCallback,
-  useRef,
-} from "react";
-import {
-  getCityById,
-  searchCities,
-  type City,
-} from "@/data/cities";
+import { useMemo, useEffect, useState, useCallback } from "react";
+import { getCityById, type City } from "@/data/cities";
 import { CityCard } from "@/components/CityPolaroidCard";
+import { AddConnectionFlow } from "@/components/AddConnectionFlow";
 import { useWeatherForCities } from "@/lib/useWeatherForCities";
-import { useTypedPlaceholder } from "@/lib/useTypedPlaceholder";
+import type { Connection } from "@/lib/types";
 import { usePostHog } from "posthog-js/react";
 
 // ─── Storage ─────────────────────────────────────────────────────────────────
 
-const SLOTS_KEY = "climara-slots-v2";
+const SLOTS_KEY = "somewher-slots-v3";
 
 interface SlotState {
-  center: string | null;
-  left: string | null;
-  right: string | null;
+  center: Connection | null;
+  left: Connection | null;
+  right: Connection | null;
 }
 
 const EMPTY_SLOTS: SlotState = { center: null, left: null, right: null };
+
+function isConnection(v: unknown): v is Connection {
+  if (typeof v !== "object" || v === null) return false;
+  const r = v as Record<string, unknown>;
+  return (
+    typeof r.id === "string" &&
+    typeof r.name === "string" &&
+    typeof r.photo === "string" &&
+    typeof r.cityId === "string"
+  );
+}
 
 function loadSlots(): SlotState {
   if (typeof window === "undefined") return EMPTY_SLOTS;
@@ -35,14 +37,15 @@ function loadSlots(): SlotState {
     const raw = localStorage.getItem(SLOTS_KEY);
     if (!raw) return EMPTY_SLOTS;
     const parsed = JSON.parse(raw) as unknown;
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "center" in parsed
-    ) {
-      return parsed as SlotState;
+    if (typeof parsed !== "object" || parsed === null || !("center" in parsed)) {
+      return EMPTY_SLOTS;
     }
-    return EMPTY_SLOTS;
+    const p = parsed as Record<string, unknown>;
+    return {
+      center: isConnection(p.center) ? p.center : null,
+      left: isConnection(p.left) ? p.left : null,
+      right: isConnection(p.right) ? p.right : null,
+    };
   } catch {
     return EMPTY_SLOTS;
   }
@@ -56,33 +59,17 @@ function persistSlots(s: SlotState): void {
   }
 }
 
-// ─── Add-city search panel ────────────────────────────────────────────────────
+// ─── Add-connection panel (modal overlay) ────────────────────────────────────
 
-function AddCityPanel({
+function AddConnectionPanel({
   onAdd,
   onClose,
-  excludeIds,
+  excludeCityIds,
 }: {
-  onAdd: (id: string) => void;
+  onAdd: (connection: Connection) => void;
   onClose: () => void;
-  excludeIds: Set<string>;
+  excludeCityIds: Set<string>;
 }) {
-  const [query, setQuery] = useState("");
-  const [listOpen, setListOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const typedCity = useTypedPlaceholder();
-  const posthog = usePostHog();
-
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node))
-        setListOpen(false);
-    }
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, []);
-
-  // Close on Escape
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -91,87 +78,35 @@ function AddCityPanel({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const results = useMemo(() => {
-    const found = searchCities(query, 12);
-    return found.filter((c) => !excludeIds.has(c.id));
-  }, [query, excludeIds]);
-
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#faf9f5] px-6">
-      {/* Blue logo */}
-      <img
-        src="/climara-logo.svg"
-        alt="Climara"
-        className="absolute top-[51px] left-1/2 -translate-x-1/2"
-        width={106}
-        height={24}
-      />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-6"
+      onClick={onClose}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40" />
 
-      {/* Close */}
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Close"
-        className="absolute top-10 right-10 flex size-9 items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors text-lg"
+      {/* Modal card */}
+      <div
+        className="relative z-10 w-full max-w-[560px] rounded-3xl bg-[#F1EDE5] px-10 py-16 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
       >
-        ✕
-      </button>
-
-      {/* Search */}
-      <div ref={wrapRef} className="relative w-full max-w-[730px]">
-        <div className="flex h-[53px] w-full items-center rounded-3xl border border-[#d9d9d9] bg-[#fcfcfc] px-6">
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setListOpen(true);
-            }}
-            onFocus={() => setListOpen(true)}
-            placeholder=""
-            autoComplete="off"
-            autoFocus
-            aria-label="Search a city"
-            className="w-full bg-transparent text-base text-black outline-none"
-            style={{ fontFamily: "var(--font-label)", fontWeight: 300 }}
-          />
-          {!query && (
-            <span
-              className="pointer-events-none absolute left-[26px] select-none text-base text-[#aaa]"
-              aria-hidden
-              style={{ fontFamily: "var(--font-label)", fontWeight: 300 }}
-            >
-              {typedCity}
-            </span>
-          )}
-        </div>
-
-        {listOpen && query.trim() && results.length > 0 ? (
-          <ul className="absolute left-0 right-0 top-full z-10 mt-2 max-h-56 overflow-auto rounded-2xl border border-stone-200/60 bg-white/95 py-1 text-left text-sm shadow-lg">
-            {results.map((c) => (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  className="w-full px-6 py-2.5 text-left hover:bg-stone-50"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    posthog?.capture('city_searched', { query });
-                    onAdd(c.id);
-                  }}
-                  style={{ fontFamily: "var(--font-label)" }}
-                >
-                  <span className="font-medium text-stone-800">{c.name}</span>
-                  <span className="font-light text-stone-400"> · {c.country}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {listOpen && query.trim() && results.length === 0 ? (
-          <p className="absolute left-0 right-0 top-full z-10 mt-2 rounded-2xl bg-white px-4 py-3 text-center text-sm text-stone-400 shadow-lg">
-            No cities found.
-          </p>
-        ) : null}
+        <img
+          src="/Somewher_dark.svg"
+          alt="Somewher"
+          className="mx-auto mb-8"
+          width={151}
+          height={27}
+        />
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-5 right-5 flex size-8 items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors text-sm"
+        >
+          ✕
+        </button>
+        <AddConnectionFlow onComplete={onAdd} excludeCityIds={excludeCityIds} />
       </div>
     </div>
   );
@@ -184,7 +119,7 @@ function AddSlotButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      aria-label="Add a city"
+      aria-label="Add someone"
       className="group flex size-14 shrink-0 items-center justify-center rounded-full border border-stone-300/70 bg-stone-100/60 text-stone-400 transition-all hover:border-stone-400 hover:bg-stone-200/70 hover:text-stone-600"
     >
       <span className="text-2xl font-light leading-none">+</span>
@@ -197,19 +132,17 @@ function AddSlotButton({ onClick }: { onClick: () => void }) {
 export default function Home() {
   const [slots, setSlots] = useState<SlotState>(EMPTY_SLOTS);
   const [addingSlot, setAddingSlot] = useState<"left" | "right" | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [listOpen, setListOpen] = useState(false);
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
-  const searchWrapRef = useRef<HTMLDivElement>(null);
-  const typedCity = useTypedPlaceholder();
   const posthog = usePostHog();
 
   useEffect(() => {
     queueMicrotask(() => {
       const loaded = loadSlots();
-      const cityCount = [loaded.center, loaded.left, loaded.right].filter(Boolean).length;
-      if (cityCount > 0) {
-        posthog?.capture('session_restored', { city_count: cityCount });
+      const count = [loaded.center, loaded.left, loaded.right].filter(
+        Boolean,
+      ).length;
+      if (count > 0) {
+        posthog?.capture("session_restored", { city_count: count });
       }
       setSlots(loaded);
     });
@@ -221,85 +154,73 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [lastAddedId]);
 
-  // Close landing-page search dropdown on outside click
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (
-        searchWrapRef.current &&
-        !searchWrapRef.current.contains(e.target as Node)
-      )
-        setListOpen(false);
-    }
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, []);
-
   const hasCities = slots.center !== null;
 
-  // All unique city IDs currently in slots
-  const allIds = useMemo(
+  const allConnections = useMemo(
     () =>
       [slots.center, slots.left, slots.right].filter(
-        (id): id is string => id !== null,
+        (c): c is Connection => c !== null,
       ),
     [slots],
   );
 
-  const addedSet = useMemo(() => new Set(allIds), [allIds]);
+  const allCityIds = useMemo(
+    () => allConnections.map((c) => c.cityId),
+    [allConnections],
+  );
+
+  const addedCityIdSet = useMemo(() => new Set(allCityIds), [allCityIds]);
 
   const addedCities: City[] = useMemo(
-    () => allIds.map((id) => getCityById(id)).filter((c): c is City => c !== undefined),
-    [allIds],
+    () =>
+      allCityIds
+        .map((id) => getCityById(id))
+        .filter((c): c is City => c !== undefined),
+    [allCityIds],
   );
 
   const weatherById = useWeatherForCities(addedCities);
 
-  // Landing page search results
-  const searchResults = useMemo(() => {
-    const found = searchCities(searchQuery, 12);
-    return found.filter((c) => !addedSet.has(c.id));
-  }, [searchQuery, addedSet]);
+  const addFirstConnection = useCallback(
+    (connection: Connection) => {
+      const city = getCityById(connection.cityId);
+      posthog?.capture("connection_added", {
+        city_name: city?.name ?? connection.cityId,
+        slot_position: "center",
+      });
+      const next: SlotState = { center: connection, left: null, right: null };
+      setSlots(next);
+      persistSlots(next);
+      setLastAddedId(connection.id);
+    },
+    [posthog],
+  );
 
-  // Add first (center) city from landing page
-  const addFirstCity = useCallback((id: string) => {
-    const city = getCityById(id);
-    posthog?.capture('city_searched', { query: searchQuery });
-    posthog?.capture('city_selected', { city_name: city?.name ?? id, slot_position: 'center' });
-    const next: SlotState = { center: id, left: null, right: null };
-    setSlots(next);
-    persistSlots(next);
-    setLastAddedId(id);
-    setSearchQuery("");
-    setListOpen(false);
-  }, [posthog, searchQuery]);
-
-  // Add city to a specific slot from the overlay
-  const addCityToSlot = useCallback(
-    (id: string) => {
+  const addConnectionToSlot = useCallback(
+    (connection: Connection) => {
       if (!addingSlot) return;
-      const city = getCityById(id);
-      posthog?.capture('city_selected', {
-        city_name: city?.name ?? id,
+      const city = getCityById(connection.cityId);
+      posthog?.capture("connection_added", {
+        city_name: city?.name ?? connection.cityId,
         slot_position: addingSlot,
       });
       setSlots((prev) => {
-        const next = { ...prev, [addingSlot]: id };
+        const next = { ...prev, [addingSlot]: connection };
         persistSlots(next);
         return next;
       });
-      setLastAddedId(id);
+      setLastAddedId(connection.id);
       setAddingSlot(null);
     },
     [addingSlot, posthog],
   );
 
-  // Remove a city from its slot
   const removeFromSlot = useCallback(
     (slot: "center" | "left" | "right") => {
-      const cityId = slots[slot];
-      const city = cityId ? getCityById(cityId) : null;
-      posthog?.capture('city_removed', {
-        city_name: city?.name ?? cityId ?? 'unknown',
+      const conn = slots[slot];
+      const city = conn ? getCityById(conn.cityId) : null;
+      posthog?.capture("connection_removed", {
+        city_name: city?.name ?? conn?.cityId ?? "unknown",
         slot_position: slot,
       });
       setSlots((prev) => {
@@ -307,13 +228,10 @@ export default function Home() {
         if (slot !== "center") {
           next = { ...prev, [slot]: null };
         } else if (prev.left !== null) {
-          // Promote left to center
           next = { center: prev.left, left: null, right: prev.right };
         } else if (prev.right !== null) {
-          // Promote right to center
           next = { center: prev.right, left: null, right: null };
         } else {
-          // No other cities — go back to landing page
           next = EMPTY_SLOTS;
         }
         persistSlots(next);
@@ -324,8 +242,8 @@ export default function Home() {
   );
 
   const openSlot = useCallback(
-    (position: 'left' | 'right') => {
-      posthog?.capture('slot_opened', { slot_position: position });
+    (position: "left" | "right") => {
+      posthog?.capture("slot_opened", { slot_position: position });
       setAddingSlot(position);
     },
     [posthog],
@@ -334,109 +252,66 @@ export default function Home() {
   // ── Landing page ────────────────────────────────────────────────────────────
   if (!hasCities) {
     return (
-      <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#faf9f5] px-6 pb-[10vh]">
+      <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-black px-6">
         <img
-          src="/sky-bg.png"
+          src="/landing-bg-new.png"
           alt=""
           aria-hidden
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-60"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
         />
+        <div className="pointer-events-none absolute inset-0 bg-black/60" />
         <img
-          src="/climara-logo-white.svg"
-          alt="Climara"
-          className="absolute top-[51px] left-1/2 -translate-x-1/2"
-          width={106}
-          height={24}
+          src="/somewher-logo-new.svg"
+          alt="Somewher"
+          className="absolute top-[36px] sm:top-[50px] left-1/2 -translate-x-1/2 z-10 w-[100px] sm:w-[151px] h-auto"
+          width={151}
+          height={26}
         />
-        <h1
-          className="relative z-10 text-center text-[40px] font-normal leading-snug text-[#777]"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          Add cities to see their weather and local time
-        </h1>
-        <div ref={searchWrapRef} className="relative z-10 mt-8 w-full max-w-[730px]">
-          <div className="flex h-[53px] w-full items-center rounded-3xl border border-[#d9d9d9] bg-[#fcfcfc] px-6">
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setListOpen(true);
-              }}
-              onFocus={() => setListOpen(true)}
-              placeholder=""
-              autoComplete="off"
-              aria-label="Search a city"
-              className="w-full bg-transparent text-base text-black outline-none"
-              style={{ fontFamily: "var(--font-label)", fontWeight: 300 }}
-            />
-            {!searchQuery && (
-              <span
-                className="pointer-events-none absolute left-[26px] select-none text-base text-[#aaa]"
-                aria-hidden
-                style={{ fontFamily: "var(--font-label)", fontWeight: 300 }}
-              >
-                {typedCity}
-              </span>
-            )}
-          </div>
-          {listOpen && searchQuery.trim() && searchResults.length > 0 ? (
-            <ul className="absolute left-0 right-0 top-full z-10 mt-2 max-h-56 overflow-auto rounded-2xl border border-stone-200/60 bg-white/95 py-1 text-left text-sm shadow-lg">
-              {searchResults.map((c) => (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    className="w-full px-6 py-2.5 text-left hover:bg-stone-50"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => addFirstCity(c.id)}
-                    style={{ fontFamily: "var(--font-label)" }}
-                  >
-                    <span className="font-medium text-stone-800">{c.name}</span>
-                    <span className="font-light text-stone-400"> · {c.country}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {listOpen && searchQuery.trim() && searchResults.length === 0 ? (
-            <p className="absolute left-0 right-0 top-full z-10 mt-2 rounded-2xl bg-white px-4 py-3 text-center text-sm text-stone-400 shadow-lg">
-              No cities found.
-            </p>
-          ) : null}
+        <div className="relative z-10 w-full max-w-[730px]">
+          <AddConnectionFlow
+            onComplete={addFirstConnection}
+            excludeCityIds={addedCityIdSet}
+            dark
+            tagline={<>Always know the time and weather<br className="hidden sm:block" /> for the people <em>you care about</em></>}
+          />
         </div>
       </div>
     );
   }
 
-  // ── City pages ──────────────────────────────────────────────────────────────
-  const centerCity = getCityById(slots.center!)!;
-  const leftCity = slots.left ? getCityById(slots.left) ?? null : null;
-  const rightCity = slots.right ? getCityById(slots.right) ?? null : null;
+  // ── Main view ───────────────────────────────────────────────────────────────
+  const centerConn = slots.center!;
+  const leftConn = slots.left;
+  const rightConn = slots.right;
+
+  const centerCity = getCityById(centerConn.cityId)!;
+  const leftCity = leftConn ? (getCityById(leftConn.cityId) ?? null) : null;
+  const rightCity = rightConn ? (getCityById(rightConn.cityId) ?? null) : null;
 
   return (
     <>
-      {/* Add-city overlay */}
       {addingSlot !== null && (
-        <AddCityPanel
-          onAdd={addCityToSlot}
+        <AddConnectionPanel
+          onAdd={addConnectionToSlot}
           onClose={() => setAddingSlot(null)}
-          excludeIds={addedSet}
+          excludeCityIds={addedCityIdSet}
         />
       )}
 
-      <div className="min-h-dvh bg-[#faf9f5] flex flex-col items-center justify-center px-6 py-16">
+      <div className="min-h-dvh bg-[#F1EDE5] flex flex-col items-center justify-center px-6 py-16">
         {/* ── Desktop fan layout ── */}
-        <div className="hidden sm:flex mx-auto w-full max-w-5xl items-center justify-center gap-16">
+        <div className="hidden sm:flex mx-auto w-full max-w-5xl items-center justify-center gap-4 lg:gap-12 px-4">
 
-          {/* Left slot */}
-          {leftCity ? (
-            <div className="shrink-0 w-[360px]">
+          {leftCity && leftConn ? (
+            <div className="flex-1 min-w-0 max-w-[360px]">
               <CityCard
                 variant="live"
                 size="standard"
                 city={leftCity}
                 weather={weatherById[leftCity.id]}
-                animateEnter={lastAddedId === leftCity.id}
+                connectionName={leftConn.name}
+                connectionPhoto={leftConn.photo}
+                animateEnter={lastAddedId === leftConn.id}
                 onRemove={() => removeFromSlot("left")}
               />
             </div>
@@ -444,27 +319,29 @@ export default function Home() {
             <AddSlotButton onClick={() => openSlot("left")} />
           )}
 
-          {/* Center (featured) */}
-          <div className="shrink-0 w-[480px]">
+          <div className="flex-[1.4] min-w-0 max-w-[480px]">
             <CityCard
               variant="live"
               size="featured"
               city={centerCity}
               weather={weatherById[centerCity.id]}
-              animateEnter={lastAddedId === centerCity.id}
+              connectionName={centerConn.name}
+              connectionPhoto={centerConn.photo}
+              animateEnter={lastAddedId === centerConn.id}
               onRemove={() => removeFromSlot("center")}
             />
           </div>
 
-          {/* Right slot */}
-          {rightCity ? (
-            <div className="shrink-0 w-[360px]">
+          {rightCity && rightConn ? (
+            <div className="flex-1 min-w-0 max-w-[360px]">
               <CityCard
                 variant="live"
                 size="standard"
                 city={rightCity}
                 weather={weatherById[rightCity.id]}
-                animateEnter={lastAddedId === rightCity.id}
+                connectionName={rightConn.name}
+                connectionPhoto={rightConn.photo}
+                animateEnter={lastAddedId === rightConn.id}
                 onRemove={() => removeFromSlot("right")}
               />
             </div>
@@ -481,32 +358,38 @@ export default function Home() {
             size="featured"
             city={centerCity}
             weather={weatherById[centerCity.id]}
-            animateEnter={lastAddedId === centerCity.id}
+            connectionName={centerConn.name}
+            connectionPhoto={centerConn.photo}
+            animateEnter={lastAddedId === centerConn.id}
             onRemove={() => removeFromSlot("center")}
           />
-          {leftCity && (
+          {leftCity && leftConn && (
             <CityCard
               variant="live"
               size="standard"
               city={leftCity}
               weather={weatherById[leftCity.id]}
-              animateEnter={lastAddedId === leftCity.id}
+              connectionName={leftConn.name}
+              connectionPhoto={leftConn.photo}
+              animateEnter={lastAddedId === leftConn.id}
               onRemove={() => removeFromSlot("left")}
             />
           )}
-          {rightCity && (
+          {rightCity && rightConn && (
             <CityCard
               variant="live"
               size="standard"
               city={rightCity}
               weather={weatherById[rightCity.id]}
-              animateEnter={lastAddedId === rightCity.id}
+              connectionName={rightConn.name}
+              connectionPhoto={rightConn.photo}
+              animateEnter={lastAddedId === rightConn.id}
               onRemove={() => removeFromSlot("right")}
             />
           )}
           <div className="flex gap-4">
-            {!leftCity && <AddSlotButton onClick={() => openSlot("left")} />}
-            {!rightCity && <AddSlotButton onClick={() => openSlot("right")} />}
+            {!leftConn && <AddSlotButton onClick={() => openSlot("left")} />}
+            {!rightConn && <AddSlotButton onClick={() => openSlot("right")} />}
           </div>
         </div>
       </div>
