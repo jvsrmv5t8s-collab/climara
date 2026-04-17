@@ -387,10 +387,9 @@ export default function Home() {
               onRemove={() => removeFromSlot("right")}
             />
           )}
-          <div className="flex gap-4">
-            {!leftConn && <AddSlotButton onClick={() => openSlot("left")} />}
-            {!rightConn && <AddSlotButton onClick={() => openSlot("right")} />}
-          </div>
+          {(!leftConn || !rightConn) && (
+            <AddSlotButton onClick={() => openSlot(!leftConn ? "left" : "right")} />
+          )}
         </div>
       </div>
     </>

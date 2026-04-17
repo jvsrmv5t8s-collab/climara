@@ -198,12 +198,12 @@ export function AddConnectionFlow({
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleNameNext()}
                 autoComplete="off"
-                className="w-full bg-transparent text-[15px] sm:text-[18px] text-black outline-none"
+                className="w-full bg-transparent text-base sm:text-[18px] text-black outline-none"
                 style={{ fontFamily: "var(--font-label)", fontWeight: 400 }}
               />
               {!name && (
                 <span
-                  className="pointer-events-none absolute left-[26px] select-none text-[15px] sm:text-[18px] text-[#aaa]"
+                  className="pointer-events-none absolute left-[26px] select-none text-base sm:text-[18px] text-[#aaa]"
                   aria-hidden
                   style={{ fontFamily: "var(--font-label)", fontWeight: 400 }}
                 >
@@ -371,12 +371,12 @@ export function AddConnectionFlow({
                 autoFocus
                 autoComplete="off"
                 aria-label="Search a city"
-                className="w-full bg-transparent text-[15px] sm:text-[18px] text-black outline-none"
+                className="w-full bg-transparent text-base sm:text-[18px] text-black outline-none"
                 style={{ fontFamily: "var(--font-label)", fontWeight: 400 }}
               />
               {!query && (
                 <span
-                  className="pointer-events-none absolute left-[26px] select-none text-[15px] sm:text-[18px] text-[#aaa]"
+                  className="pointer-events-none absolute left-[26px] select-none text-base sm:text-[18px] text-[#aaa]"
                   aria-hidden
                   style={{ fontFamily: "var(--font-label)", fontWeight: 400 }}
                 >
