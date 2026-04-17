@@ -30,7 +30,7 @@ const jost = Jost({
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://somewher.co";
 
 export const metadata: Metadata = {
-  title: "Somewher — Always know the time and weather for the people you care about",
+  title: "Somewher",
   icons: {
     icon: "/Somewher_MacOS.png",
     apple: "/Somewher_MacOS.png",
